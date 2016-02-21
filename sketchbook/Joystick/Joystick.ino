@@ -5,6 +5,26 @@
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 
+#include <aJSON.h>
+#include "SPI.h"
+#include "WiFi.h"
+
+#include "M2XStreamClient.h"
+
+char ssid[] = "BitwiseHacks"; //  your network SSID (name)
+char pass[] = "bwhackathon";    // your network password (use for WPA, or use as key for WEP)
+int keyIndex = 0;            // your network key Index number (needed only for WEP)
+
+int status = WL_IDLE_STATUS;
+
+char deviceId[] = "5b51e4b772e8ab8d0e04e95b9cbe9fec"; // Device you want to push to
+char streamName[] = "completed-orders"; // Stream you want to push to
+char m2xKey[] = "6dec8ed279b20d29e9835233362dcd89"; // Your M2X access key
+
+WiFiClient client;
+M2XStreamClient m2xClient(&client, m2xKey);
+
+
 
 //Set up joystick constant pins
 const int joystickSel = 4;     // the number of the joystick select pin
@@ -36,8 +56,34 @@ void setup() {
   lcd.begin();
   lcd.backlight();
   lcd.print("Hello");
-  delay(1234);
   Serial.begin(9600);
+  
+   // attempt to connect to Wifi network:
+    Serial.print("Attempting to connect to Network named: ");
+    // print the network name (SSID);
+    Serial.println(ssid); 
+    // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
+    WiFi.begin(ssid, pass);
+    while ( WiFi.status() != WL_CONNECTED) {
+      // print dots while we wait to connect
+      Serial.print(".");
+      delay(300);
+    }
+  
+    Serial.println("\nYou're connected to the network");
+    Serial.println("Waiting for an ip address");
+  
+    while (WiFi.localIP() == INADDR_NONE) {
+      // print dots while we wait for an ip addresss
+      Serial.print(".");
+      delay(300);
+    }
+
+    Serial.println("\nIP Address obtained");
+  
+    // you're connected now, so print out the status  
+    printWifiStatus();
+    
   
   msgs[0] =  "Item ID:XXXXxXX OID:XXX @XX:XXam";
   msgs[1] =  "Item ID: B23x1  OID: 01 @10:45am";
@@ -107,13 +153,20 @@ void loop(){
 //      msgs[l-1] = msgs[--i];
 //      msgs[i] = temp;
 //      l--;
+      String temp = msgs[i-1];
+      lcd.clear();
+      lcd.print("Order complete");
+      int response = m2xClient.updateStreamValue(deviceId, streamName, temp);
+      Serial.print("M2X client response code: ");
+      Serial.println(response);        
+    
+      if (response == -1)
+        while (1)
+          ;
       for(int k = i; k < l; k++){
         msgs[k-1] = msgs[k];
       }
       --l;
-      lcd.clear();
-      lcd.print("Order complete");
-      delay(500);
       i = 0;
       display(msgs[i]);
     }
@@ -134,4 +187,15 @@ void display(String text){
   {
     lcd.print(text);
   }
+}
+
+void printWifiStatus() {
+  // print the SSID of the network you're attached to:
+  Serial.print("SSID: ");
+  Serial.println(WiFi.SSID());
+
+  // print your WiFi shield's IP address:
+  IPAddress ip = WiFi.localIP();
+  Serial.print("IP Address: ");
+  Serial.println(ip);
 }
